@@ -96,6 +96,7 @@ Scraper.prototype.parseWishlist = function(errors, window) {
   });
 
   if (saleCount > 0) {
+    body = body.split('/anthro').join(BASE_URI + '/anthro');
     var saleStat = saleCount + '/' + $('.pinfotop1').length
       + ' items on your Anthro wishlist are on sale.';
 
@@ -116,7 +117,7 @@ Scraper.prototype.sendAlert = function(subject, contents) {
   var texts = WISHLISTS[this.wishlist].text;
   for (var i = 0, ii = texts.length; i < ii; i += 1) {
     var text = texts[i];
-    sendText(text, subject + ' '  + contents);
+    this.sendText(text, subject + ' '  + contents);
   }
 }
 
