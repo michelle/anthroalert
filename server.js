@@ -1,10 +1,10 @@
 var request = require('request').defaults({jar: true});
 var nodemailer = require('nodemailer');
 var jsdom = require('jsdom');
-//var argv = require('optimist')
-//  .alias('p', 'password')
-//  .demand(['p'])
-//  .argv;
+var argv = require('optimist')
+  .alias('p', 'password')
+  .demand(['p'])
+  .argv;
 
 var BASE_URI = 'http://www.anthropologie.com';
 var WISHLIST_PATH = '/anthro/wishlist/wishlist.jsp?emailOrigin=true&giftlistId=';
@@ -13,20 +13,20 @@ var SALE_CLASS = '.wasPrice';
 var WISHLISTS = {
   'gl_PHL2590928665': {
     email: ['analogmidnight@gmail.com', 'michelle@stripe.com'],
-    text: ['2103851605'],
+    text: [] // TODO
   }
 };
 
 // Anthro is silly and can't find the wishlist at first.
 var DYNAMIC_REGEX = /\/anthro\/wishlist\/wishlist\.jsp\?emailOrigin=true&giftlistId=[A-Za-z0-9_]+(&_DARGS=\/.+&_dynSessConf=[A-Za-z0-9_\-]+)/g;
 
-//var smtpTransport = nodemailer.createTransport("SMTP",{
-//  service: "Gmail",
-//  auth: {
-//    user: "moosefrans@gmail.com",
-//    pass: argv.password
-//  }
-//});
+var smtpTransport = nodemailer.createTransport("SMTP",{
+  service: "Gmail",
+  auth: {
+    user: "moosefrans@gmail.com",
+    pass: argv.password
+  }
+});
 
 
 var Scraper = function(wishlist) {
@@ -70,7 +70,7 @@ Scraper.prototype.scrape = function() {
 
     setTimeout(function() {
       self.scrape(self.wishlist);
-    }, 1800000) // Wait 30 mins before scraping again.
+    }, 900000); // Wait 30 mins before scraping again.
 
   });
 }
@@ -91,6 +91,7 @@ Scraper.prototype.parseWishlist = function(errors, window) {
       saleCount += 1;
       var product = $item.find('.productName').html();
       body += product;
+      body += ': ' + $item.find('.pprice').text().split('was').join('( was') + ')';
       body += '<br>';
     }
   });
@@ -107,26 +108,35 @@ Scraper.prototype.parseWishlist = function(errors, window) {
 }
 
 Scraper.prototype.sendAlert = function(subject, contents) {
-  this.log('Sending alert: ' + subject + ' ' + contents);
+  var sentContents = WISHLISTS[this.wishlist].sent || {};
+  if (sentContents[contents]) {
+    this.log('No new sales.');
+    return;
+  }
+  sentContents[contents] = 1;
+  WISHLISTS[this.wishlist].sent = sentContents;
+
+  this.log('Sending alert: ' + subject);
   var emails = WISHLISTS[this.wishlist].email;
-  for (var i = 0, ii = emails.length; i < ii; i += 1) {
-    var email = emails[i];
-    this.sendMail(email, contents);
-  }
-
-  var texts = WISHLISTS[this.wishlist].text;
-  for (var i = 0, ii = texts.length; i < ii; i += 1) {
-    var text = texts[i];
-    this.sendText(text, subject + ' '  + contents);
-  }
+  this.sendMail(emails.join(', '), subject, contents);
 }
 
-Scraper.prototype.sendMail = function(email, subject, contents) {
+Scraper.prototype.sendMail = function(emails, subject, contents) {
   // TODO
-}
-
-Scraper.prototype.sendText = function(number, contents) {
-  // TODO
+  var self = this;
+  smtpTransport.sendMail({
+    from: 'Anthromoose <moosefrans@gmail.com>', // sender address
+    to: emails, // list of receivers
+    subject: subject, // Subject line
+    text: contents, // plaintext body
+    html: contents // html body
+  }, function(err, res) {
+    if (err) {
+      self.log('Failed to send email: ' + err);
+    } else {
+      self.log('Sent emails to ' + emails);
+    }
+  });
 }
 
 Scraper.prototype.log = function(msg) {
