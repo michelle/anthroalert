@@ -105,6 +105,7 @@ Scraper.prototype.parseWishlist = function(errors, window) {
   } else {
     this.log('Found no sales.');
   }
+  window.close();
 }
 
 Scraper.prototype.sendAlert = function(subject, contents) {
